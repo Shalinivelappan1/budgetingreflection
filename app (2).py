@@ -3,7 +3,8 @@ import pandas as pd
 from fpdf import FPDF
 from datetime import date
 from pathlib import Path
-import requests
+import matplotlib.pyplot as plt
+import tempfile
 
 # --------------------------------------------------
 # Page Configuration
@@ -15,22 +16,94 @@ st.set_page_config(
 )
 
 st.title("💰 Smart Budget & Expense Tracker")
-st.caption("Finance-first learning | No AI | Unicode-safe PDFs")
+st.caption("Finance-first learning | No AI | Assessment-ready")
 
 # --------------------------------------------------
-# Helper: Auto-download Unicode font
+# Helpers
 # --------------------------------------------------
 def load_unicode_font():
     font_path = Path("DejaVuSans.ttf")
     if not font_path.exists():
-        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-        response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            st.error("Unable to load Unicode font. Please refresh and try again.")
-            st.stop()
-        with open(font_path, "wb") as f:
-            f.write(response.content)
+        st.error(
+            "Unicode font missing. Please ensure DejaVuSans.ttf "
+            "is present in the app directory."
+        )
+        st.stop()
     return font_path
+
+
+def add_expense_table_to_pdf(pdf, df):
+    pdf.set_font("DejaVu", "B", 12)
+    pdf.cell(0, 8, "🧾 Expense Breakdown", ln=True)
+    pdf.ln(2)
+
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.cell(110, 8, "Category", border=1)
+    pdf.cell(40, 8, "Amount (₹)", border=1, ln=True)
+
+    pdf.set_font("DejaVu", "", 11)
+    for _, row in df.iterrows():
+        pdf.cell(110, 8, row["Category"], border=1)
+        pdf.cell(40, 8, f"₹{row['Amount (₹)']:,.0f}", border=1, ln=True)
+
+    pdf.ln(4)
+
+
+def add_expense_chart_to_pdf(pdf, df):
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.bar(df["Category"], df["Amount (₹)"])
+    ax.set_title("Expense Distribution")
+    ax.set_ylabel("Amount (₹)")
+    ax.tick_params(axis="x", rotation=45)
+    plt.tight_layout()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        chart_path = tmp.name
+        plt.savefig(chart_path, dpi=150)
+
+    plt.close(fig)
+
+    pdf.set_font("DejaVu", "B", 12)
+    pdf.cell(0, 8, "📊 Expense Distribution Chart", ln=True)
+    pdf.ln(2)
+    pdf.image(chart_path, x=15, w=180)
+    pdf.ln(5)
+
+
+def add_savings_vs_expenses_chart(pdf, df, savings):
+    needs_categories = ["Housing (Rent / EMI)", "Food", "Utilities"]
+    wants_categories = ["Lifestyle & Entertainment"]
+
+    needs = df[df["Category"].isin(needs_categories)]["Amount (₹)"].sum()
+    wants = df[df["Category"].isin(wants_categories)]["Amount (₹)"].sum()
+    other = df[~df["Category"].isin(needs_categories + wants_categories)]["Amount (₹)"].sum()
+
+    labels = ["Needs", "Wants", "Other Expenses", "Savings"]
+    values = [needs, wants, other, max(savings, 0)]
+    colors = ["#d62728", "#ff7f0e", "#7f7f7f", "#2ca02c"]  # red, orange, grey, green
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.bar(labels, values, color=colors)
+    ax.set_title("Savings vs Expenses (Needs / Wants)")
+    ax.set_ylabel("Amount (₹)")
+
+    for i, v in enumerate(values):
+        ax.text(i, v + max(values) * 0.02, f"₹{v:,.0f}", ha="center", fontsize=9)
+
+    plt.tight_layout()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        chart_path = tmp.name
+        plt.savefig(chart_path, dpi=150)
+
+    plt.close(fig)
+
+    pdf.set_font("DejaVu", "B", 12)
+    pdf.cell(0, 8, "📊 Savings vs Expenses Overview", ln=True)
+    pdf.ln(2)
+    pdf.image(chart_path, x=15, w=180)
+    pdf.ln(5)
+
 
 # --------------------------------------------------
 # Tabs
@@ -60,9 +133,7 @@ with tab1:
         "Others"
     ]
 
-    expenses = {}
-    for cat in categories:
-        expenses[cat] = st.number_input(f"{cat} (₹)", min_value=0, step=500)
+    expenses = {cat: st.number_input(f"{cat} (₹)", min_value=0, step=500) for cat in categories}
 
     df = pd.DataFrame({
         "Category": expenses.keys(),
@@ -99,40 +170,14 @@ with tab1:
     st.bar_chart(df.set_index("Category"))
 
     st.divider()
-    st.subheader("🧠 Smart Budget Insights")
-
-    if income == 0:
-        st.warning("Enter income to activate insights.")
-    else:
-        if savings < 0:
-            st.error("⚠️ You are spending more than your income.")
-        elif savings_rate < 20:
-            st.warning("⚠️ Savings are below the recommended 20%.")
-        else:
-            st.success("✅ Your savings behavior looks healthy.")
-
-        for _, row in df.iterrows():
-            share = (row["Amount (₹)"] / income * 100) if income > 0 else 0
-            if row["Category"].startswith("Housing") and share > 30:
-                st.write(f"🏠 **{row['Category']}** is high ({share:.1f}%). Ideal ≤ 30%.")
-            elif row["Category"] == "Lifestyle & Entertainment" and share > 20:
-                st.write(f"🎉 **{row['Category']}** is high ({share:.1f}%).")
-            elif share > 25:
-                st.write(f"📌 **{row['Category']}** is relatively high ({share:.1f}%).")
-
-    st.divider()
     st.subheader("🇮🇳 30–30–20 Rule Check")
 
-    needs = df.loc[df["Category"].isin(
-        ["Housing (Rent / EMI)", "Food", "Utilities"]), "Amount (₹)"].sum()
-    wants = df.loc[df["Category"] == "Lifestyle & Entertainment", "Amount (₹)"].sum()
+    needs = df[df["Category"].isin(["Housing (Rent / EMI)", "Food", "Utilities"])]["Amount (₹)"].sum()
+    wants = df[df["Category"] == "Lifestyle & Entertainment"]["Amount (₹)"].sum()
 
-    needs_pct = (needs / income * 100) if income > 0 else 0
-    wants_pct = (wants / income * 100) if income > 0 else 0
-
-    st.write(f"**Needs:** {needs_pct:.1f}% (Target ≤ 30%)")
-    st.write(f"**Wants:** {wants_pct:.1f}% (Target ≤ 30%)")
-    st.write(f"**Savings:** {savings_rate:.1f}% (Target ≥ 20%)")
+    st.write(f"**Needs:** {(needs / income * 100) if income else 0:.1f}% (≤ 30%)")
+    st.write(f"**Wants:** {(wants / income * 100) if income else 0:.1f}% (≤ 30%)")
+    st.write(f"**Savings:** {savings_rate:.1f}% (≥ 20%)")
 
 # ==================================================
 # TAB 2: REFLECTION + PDF
@@ -140,7 +185,7 @@ with tab1:
 with tab2:
 
     st.header("🧠 Reflection & Learning Submission")
-    st.caption("One-click PDF with budget summary + reflection.")
+    st.caption("Generates a professional PDF with data + reflection.")
 
     student_name = st.text_input("Student Name")
     course = st.text_input("Course / Section")
@@ -182,18 +227,16 @@ with tab2:
         pdf.cell(0, 8, f"Expenses: ₹{total_expenses:,.0f}", ln=True)
         pdf.cell(0, 8, f"Savings: ₹{savings:,.0f}", ln=True)
         pdf.cell(0, 8, f"Savings Rate: {savings_rate:.1f}%", ln=True)
-        pdf.cell(0, 8, f"Expense-to-Income Ratio: {expense_ratio:.1f}%", ln=True)
 
         pdf.ln(4)
+        add_expense_table_to_pdf(pdf, df)
+        add_expense_chart_to_pdf(pdf, df)
+        add_savings_vs_expenses_chart(pdf, df, savings)
+
         pdf.set_font("DejaVu", "B", 12)
         pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
-
         pdf.set_font("DejaVu", "", 11)
-        pdf.multi_cell(0, 8, f"1. {r1}\n")
-        pdf.multi_cell(0, 8, f"2. {r2}\n")
-        pdf.multi_cell(0, 8, f"3. {r3}\n")
-        pdf.multi_cell(0, 8, f"4. {r4}\n")
-        pdf.multi_cell(0, 8, f"5. {r5}\n")
+        pdf.multi_cell(0, 8, f"1. {r1}\n2. {r2}\n3. {r3}\n4. {r4}\n5. {r5}")
 
         filename = f"{student_name.replace(' ', '_')}_Budget_Submission.pdf"
         pdf.output(filename)
