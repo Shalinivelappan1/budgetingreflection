@@ -16,23 +16,31 @@ st.set_page_config(
 )
 
 st.title("💰 Smart Budget & Expense Tracker")
-st.caption("Finance-first learning | No AI | Assessment-ready")
+st.caption("Finance-first learning | Assessment-ready | Unicode-safe PDF")
 
 # --------------------------------------------------
-# Helpers
+# FONT LOADER (CRITICAL)
 # --------------------------------------------------
-def load_unicode_font():
-    font_path = Path("DejaVuSans.ttf")
-    if not font_path.exists():
+def load_unicode_fonts(pdf):
+    root = Path(__file__).parent
+    regular = root / "DejaVuSans.ttf"
+    bold = root / "DejaVuSans-Bold.ttf"
+
+    if not regular.exists() or not bold.exists():
         st.error(
-            "Unicode font missing. Please ensure DejaVuSans.ttf "
-            "is present in the app directory."
+            "Unicode font files missing.\n"
+            "Ensure BOTH DejaVuSans.ttf and DejaVuSans-Bold.ttf are present "
+            "in the app directory."
         )
         st.stop()
-    return font_path
 
+    pdf.add_font("DejaVu", "", str(regular), uni=True)
+    pdf.add_font("DejaVu", "B", str(bold), uni=True)
 
-def add_expense_table_to_pdf(pdf, df):
+# --------------------------------------------------
+# PDF HELPERS
+# --------------------------------------------------
+def add_expense_table(pdf, df):
     pdf.set_font("DejaVu", "B", 12)
     pdf.cell(0, 8, "🧾 Expense Breakdown", ln=True)
     pdf.ln(2)
@@ -49,7 +57,7 @@ def add_expense_table_to_pdf(pdf, df):
     pdf.ln(4)
 
 
-def add_expense_chart_to_pdf(pdf, df):
+def add_expense_chart(pdf, df):
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.bar(df["Category"], df["Amount (₹)"])
     ax.set_title("Expense Distribution")
@@ -64,7 +72,7 @@ def add_expense_chart_to_pdf(pdf, df):
     plt.close(fig)
 
     pdf.set_font("DejaVu", "B", 12)
-    pdf.cell(0, 8, "📊 Expense Distribution Chart", ln=True)
+    pdf.cell(0, 8, "📊 Expense Distribution", ln=True)
     pdf.ln(2)
     pdf.image(chart_path, x=15, w=180)
     pdf.ln(5)
@@ -80,7 +88,7 @@ def add_savings_vs_expenses_chart(pdf, df, savings):
 
     labels = ["Needs", "Wants", "Other Expenses", "Savings"]
     values = [needs, wants, other, max(savings, 0)]
-    colors = ["#d62728", "#ff7f0e", "#7f7f7f", "#2ca02c"]  # red, orange, grey, green
+    colors = ["#d62728", "#ff7f0e", "#7f7f7f", "#2ca02c"]
 
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.bar(labels, values, color=colors)
@@ -104,9 +112,8 @@ def add_savings_vs_expenses_chart(pdf, df, savings):
     pdf.image(chart_path, x=15, w=180)
     pdf.ln(5)
 
-
 # --------------------------------------------------
-# Tabs
+# TABS
 # --------------------------------------------------
 tab1, tab2 = st.tabs(["📊 Budget Dashboard", "🧠 Reflection & Submission"])
 
@@ -114,7 +121,6 @@ tab1, tab2 = st.tabs(["📊 Budget Dashboard", "🧠 Reflection & Submission"])
 # TAB 1: BUDGET DASHBOARD
 # ==================================================
 with tab1:
-
     period = st.radio("Select Budget Period", ["Monthly", "Yearly"], horizontal=True)
     st.divider()
 
@@ -133,59 +139,24 @@ with tab1:
         "Others"
     ]
 
-    expenses = {cat: st.number_input(f"{cat} (₹)", min_value=0, step=500) for cat in categories}
-
-    df = pd.DataFrame({
-        "Category": expenses.keys(),
-        "Amount (₹)": expenses.values()
-    })
+    expenses = {c: st.number_input(f"{c} (₹)", min_value=0, step=500) for c in categories}
+    df = pd.DataFrame({"Category": expenses.keys(), "Amount (₹)": expenses.values()})
 
     total_expenses = df["Amount (₹)"].sum()
     savings = income - total_expenses
     savings_rate = (savings / income * 100) if income > 0 else 0
-    expense_ratio = (total_expenses / income * 100) if income > 0 else 0
 
     st.divider()
-    st.subheader("📈 Budget Summary")
-
     c1, c2, c3 = st.columns(3)
     c1.metric("Income", f"₹{income:,.0f}")
     c2.metric("Expenses", f"₹{total_expenses:,.0f}")
     c3.metric("Savings", f"₹{savings:,.0f}")
 
-    st.subheader("📉 Expense-to-Income Ratio")
-    st.progress(min(int(expense_ratio), 100))
-    st.caption(f"You are spending **{expense_ratio:.1f}%** of your income")
-
-    st.subheader("🎯 Savings Goal Tracker")
-    if savings_goal > 0:
-        st.progress(max(min(savings / savings_goal, 1.0), 0.0))
-        st.caption(f"₹{savings:,.0f} saved out of ₹{savings_goal:,.0f}")
-    else:
-        st.info("Set a savings goal to track progress.")
-
-    st.divider()
-    st.subheader("🧾 Expense Breakdown")
-    st.dataframe(df, use_container_width=True)
-    st.bar_chart(df.set_index("Category"))
-
-    st.divider()
-    st.subheader("🇮🇳 30–30–20 Rule Check")
-
-    needs = df[df["Category"].isin(["Housing (Rent / EMI)", "Food", "Utilities"])]["Amount (₹)"].sum()
-    wants = df[df["Category"] == "Lifestyle & Entertainment"]["Amount (₹)"].sum()
-
-    st.write(f"**Needs:** {(needs / income * 100) if income else 0:.1f}% (≤ 30%)")
-    st.write(f"**Wants:** {(wants / income * 100) if income else 0:.1f}% (≤ 30%)")
-    st.write(f"**Savings:** {savings_rate:.1f}% (≥ 20%)")
-
 # ==================================================
 # TAB 2: REFLECTION + PDF
 # ==================================================
 with tab2:
-
     st.header("🧠 Reflection & Learning Submission")
-    st.caption("Generates a professional PDF with data + reflection.")
 
     student_name = st.text_input("Student Name")
     course = st.text_input("Course / Section")
@@ -197,17 +168,14 @@ with tab2:
     r5 = st.text_area("5️⃣ One-line reflection: “After this activity, I realized that …”")
 
     if st.button("📄 Generate PDF Submission"):
-
         if not student_name or not course:
             st.warning("Please enter your name and course.")
             st.stop()
 
-        font_path = load_unicode_font()
-
         pdf = FPDF()
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_font("DejaVu", "", str(font_path), uni=True)
+        load_unicode_fonts(pdf)
 
         pdf.set_font("DejaVu", "B", 14)
         pdf.cell(0, 10, "Budgeting & Expense Tracker – Submission", ln=True)
@@ -222,21 +190,20 @@ with tab2:
         pdf.cell(0, 8, "📊 Budget Summary", ln=True)
 
         pdf.set_font("DejaVu", "", 11)
-        pdf.cell(0, 8, f"Period: {period}", ln=True)
         pdf.cell(0, 8, f"Income: ₹{income:,.0f}", ln=True)
         pdf.cell(0, 8, f"Expenses: ₹{total_expenses:,.0f}", ln=True)
         pdf.cell(0, 8, f"Savings: ₹{savings:,.0f}", ln=True)
         pdf.cell(0, 8, f"Savings Rate: {savings_rate:.1f}%", ln=True)
 
         pdf.ln(4)
-        add_expense_table_to_pdf(pdf, df)
-        add_expense_chart_to_pdf(pdf, df)
+        add_expense_table(pdf, df)
+        add_expense_chart(pdf, df)
         add_savings_vs_expenses_chart(pdf, df, savings)
 
         pdf.set_font("DejaVu", "B", 12)
         pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
         pdf.set_font("DejaVu", "", 11)
-        pdf.multi_cell(0, 8, f"1. {r1}\n2. {r2}\n3. {r3}\n4. {r4}\n5. {r5}")
+        pdf.multi_cell(0, 8, f"{r1}\n\n{r2}\n\n{r3}\n\n{r4}\n\n{r5}")
 
         filename = f"{student_name.replace(' ', '_')}_Budget_Submission.pdf"
         pdf.output(filename)
