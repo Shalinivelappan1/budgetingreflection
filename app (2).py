@@ -3,6 +3,7 @@ import pandas as pd
 from fpdf import FPDF
 from datetime import date
 from pathlib import Path
+import requests
 
 # --------------------------------------------------
 # Page Configuration
@@ -17,6 +18,21 @@ st.title("💰 Smart Budget & Expense Tracker")
 st.caption("Finance-first learning | No AI | Unicode-safe PDFs")
 
 # --------------------------------------------------
+# Helper: Auto-download Unicode font
+# --------------------------------------------------
+def load_unicode_font():
+    font_path = Path("DejaVuSans.ttf")
+    if not font_path.exists():
+        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            st.error("Unable to load Unicode font. Please refresh and try again.")
+            st.stop()
+        with open(font_path, "wb") as f:
+            f.write(response.content)
+    return font_path
+
+# --------------------------------------------------
 # Tabs
 # --------------------------------------------------
 tab1, tab2 = st.tabs(["📊 Budget Dashboard", "🧠 Reflection & Submission"])
@@ -26,19 +42,13 @@ tab1, tab2 = st.tabs(["📊 Budget Dashboard", "🧠 Reflection & Submission"])
 # ==================================================
 with tab1:
 
-    period = st.radio(
-        "Select Budget Period",
-        ["Monthly", "Yearly"],
-        horizontal=True
-    )
-
+    period = st.radio("Select Budget Period", ["Monthly", "Yearly"], horizontal=True)
     st.divider()
 
     income = st.number_input(f"{period} Income (₹)", min_value=0, step=1000)
     savings_goal = st.number_input(f"{period} Savings Goal (₹)", min_value=0, step=1000)
 
     st.divider()
-
     st.subheader("📊 Expenses")
 
     categories = [
@@ -113,37 +123,24 @@ with tab1:
     st.divider()
     st.subheader("🇮🇳 30–30–20 Rule Check")
 
-    needs = df.loc[
-        df["Category"].isin(["Housing (Rent / EMI)", "Food", "Utilities"]),
-        "Amount (₹)"
-    ].sum()
-
-    wants = df.loc[
-        df["Category"] == "Lifestyle & Entertainment",
-        "Amount (₹)"
-    ].sum()
+    needs = df.loc[df["Category"].isin(
+        ["Housing (Rent / EMI)", "Food", "Utilities"]), "Amount (₹)"].sum()
+    wants = df.loc[df["Category"] == "Lifestyle & Entertainment", "Amount (₹)"].sum()
 
     needs_pct = (needs / income * 100) if income > 0 else 0
     wants_pct = (wants / income * 100) if income > 0 else 0
-    savings_pct = savings_rate
 
     st.write(f"**Needs:** {needs_pct:.1f}% (Target ≤ 30%)")
     st.write(f"**Wants:** {wants_pct:.1f}% (Target ≤ 30%)")
-    st.write(f"**Savings:** {savings_pct:.1f}% (Target ≥ 20%)")
+    st.write(f"**Savings:** {savings_rate:.1f}% (Target ≥ 20%)")
 
 # ==================================================
-# TAB 2: REFLECTION + PDF SUBMISSION
+# TAB 2: REFLECTION + PDF
 # ==================================================
 with tab2:
 
     st.header("🧠 Reflection & Learning Submission")
-    st.caption("Your answers will be saved as a Unicode-safe PDF.")
-
-    # ---- Font uploader (CRITICAL FIX) ----
-    font_file = st.file_uploader(
-        "📎 Upload Unicode Font (DejaVuSans.ttf – required once)",
-        type=["ttf"]
-    )
+    st.caption("One-click PDF with budget summary + reflection.")
 
     student_name = st.text_input("Student Name")
     course = st.text_input("Course / Section")
@@ -156,27 +153,17 @@ with tab2:
 
     if st.button("📄 Generate PDF Submission"):
 
-        if not font_file:
-            st.error("Please upload DejaVuSans.ttf to generate the PDF.")
-            st.stop()
-
         if not student_name or not course:
             st.warning("Please enter your name and course.")
             st.stop()
 
-        # Save uploaded font locally
-        font_path = Path("DejaVuSans.ttf")
-        with open(font_path, "wb") as f:
-            f.write(font_file.read())
+        font_path = load_unicode_font()
 
         pdf = FPDF()
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
-
         pdf.add_font("DejaVu", "", str(font_path), uni=True)
-        pdf.set_font("DejaVu", "", 11)
 
-        # Title
         pdf.set_font("DejaVu", "B", 14)
         pdf.cell(0, 10, "Budgeting & Expense Tracker – Submission", ln=True)
 
@@ -186,10 +173,9 @@ with tab2:
         pdf.cell(0, 8, f"Date: {date.today().strftime('%d %B %Y')}", ln=True)
 
         pdf.ln(4)
-
-        # Budget summary
         pdf.set_font("DejaVu", "B", 12)
         pdf.cell(0, 8, "📊 Budget Summary", ln=True)
+
         pdf.set_font("DejaVu", "", 11)
         pdf.cell(0, 8, f"Period: {period}", ln=True)
         pdf.cell(0, 8, f"Income: ₹{income:,.0f}", ln=True)
@@ -198,27 +184,16 @@ with tab2:
         pdf.cell(0, 8, f"Savings Rate: {savings_rate:.1f}%", ln=True)
         pdf.cell(0, 8, f"Expense-to-Income Ratio: {expense_ratio:.1f}%", ln=True)
 
-        pdf.ln(3)
-
-        # 30–30–20 rule
-        pdf.set_font("DejaVu", "B", 12)
-        pdf.cell(0, 8, "🇮🇳 30–30–20 Rule Check", ln=True)
-        pdf.set_font("DejaVu", "", 11)
-        pdf.cell(0, 8, f"Needs: {needs_pct:.1f}%", ln=True)
-        pdf.cell(0, 8, f"Wants: {wants_pct:.1f}%", ln=True)
-        pdf.cell(0, 8, f"Savings: {savings_pct:.1f}%", ln=True)
-
         pdf.ln(4)
-
-        # Reflection
         pdf.set_font("DejaVu", "B", 12)
         pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
+
         pdf.set_font("DejaVu", "", 11)
-        pdf.multi_cell(0, 8, f"1. Spending Surprise:\n{r1}\n")
-        pdf.multi_cell(0, 8, f"2. Expense Reduction:\n{r2}\n")
-        pdf.multi_cell(0, 8, f"3. 30–30–20 Rule Reflection:\n{r3}\n")
-        pdf.multi_cell(0, 8, f"4. Habit to Change:\n{r4}\n")
-        pdf.multi_cell(0, 8, f"5. One-Line Reflection:\n{r5}\n")
+        pdf.multi_cell(0, 8, f"1. {r1}\n")
+        pdf.multi_cell(0, 8, f"2. {r2}\n")
+        pdf.multi_cell(0, 8, f"3. {r3}\n")
+        pdf.multi_cell(0, 8, f"4. {r4}\n")
+        pdf.multi_cell(0, 8, f"5. {r5}\n")
 
         filename = f"{student_name.replace(' ', '_')}_Budget_Submission.pdf"
         pdf.output(filename)
