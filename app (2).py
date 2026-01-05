@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from fpdf import FPDF
 from datetime import date
+from pathlib import Path
 
 # --------------------------------------------------
 # Page Configuration
@@ -13,7 +14,7 @@ st.set_page_config(
 )
 
 st.title("💰 Smart Budget & Expense Tracker")
-st.caption("Finance-first learning | No AI | No API keys")
+st.caption("Developed by Prof.Shalini Velappan, IIM Trichy")
 
 # --------------------------------------------------
 # Tabs
@@ -25,7 +26,6 @@ tab1, tab2 = st.tabs(["📊 Budget Dashboard", "🧠 Reflection & Submission"])
 # ==================================================
 with tab1:
 
-    # Period selection
     period = st.radio(
         "Select Budget Period",
         ["Monthly", "Yearly"],
@@ -34,13 +34,11 @@ with tab1:
 
     st.divider()
 
-    # Income & savings goal
     income = st.number_input(f"{period} Income (₹)", min_value=0, step=1000)
     savings_goal = st.number_input(f"{period} Savings Goal (₹)", min_value=0, step=1000)
 
     st.divider()
 
-    # Expense inputs
     st.subheader("📊 Expenses")
 
     categories = [
@@ -66,7 +64,6 @@ with tab1:
     savings_rate = (savings / income * 100) if income > 0 else 0
     expense_ratio = (total_expenses / income * 100) if income > 0 else 0
 
-    # Summary metrics
     st.divider()
     st.subheader("📈 Budget Summary")
 
@@ -75,12 +72,10 @@ with tab1:
     c2.metric("Expenses", f"₹{total_expenses:,.0f}")
     c3.metric("Savings", f"₹{savings:,.0f}")
 
-    # Expense-to-income ratio
     st.subheader("📉 Expense-to-Income Ratio")
     st.progress(min(int(expense_ratio), 100))
     st.caption(f"You are spending **{expense_ratio:.1f}%** of your income")
 
-    # Savings goal tracker
     st.subheader("🎯 Savings Goal Tracker")
     if savings_goal > 0:
         st.progress(max(min(savings / savings_goal, 1.0), 0.0))
@@ -88,13 +83,11 @@ with tab1:
     else:
         st.info("Set a savings goal to track progress.")
 
-    # Expense breakdown
     st.divider()
     st.subheader("🧾 Expense Breakdown")
     st.dataframe(df, use_container_width=True)
     st.bar_chart(df.set_index("Category"))
 
-    # AI-like insights
     st.divider()
     st.subheader("🧠 Smart Budget Insights")
 
@@ -117,7 +110,6 @@ with tab1:
             elif share > 25:
                 st.write(f"📌 **{row['Category']}** is relatively high ({share:.1f}%).")
 
-    # India 30–30–20 rule
     st.divider()
     st.subheader("🇮🇳 30–30–20 Rule Check")
 
@@ -139,22 +131,13 @@ with tab1:
     st.write(f"**Wants:** {wants_pct:.1f}% (Target ≤ 30%)")
     st.write(f"**Savings:** {savings_pct:.1f}% (Target ≥ 20%)")
 
-    # CSV download
-    st.divider()
-    st.download_button(
-        "📥 Download Budget CSV",
-        data=df.to_csv(index=False),
-        file_name="budget_summary.csv",
-        mime="text/csv"
-    )
-
 # ==================================================
 # TAB 2: REFLECTION + PDF SUBMISSION
 # ==================================================
 with tab2:
 
     st.header("🧠 Reflection & Learning Submission")
-    st.caption("This will generate a PDF including your budget summary.")
+    st.caption("Your answers will be saved as a Unicode-safe PDF.")
 
     student_name = st.text_input("Student Name")
     course = st.text_input("Course / Section")
@@ -174,21 +157,26 @@ with tab2:
             pdf.add_page()
             pdf.set_auto_page_break(auto=True, margin=15)
 
+            # Load Unicode font
+            font_path = Path(__file__).parent / "DejaVuSans.ttf"
+            pdf.add_font("DejaVu", "", str(font_path), uni=True)
+            pdf.set_font("DejaVu", "", 11)
+
             # Title
-            pdf.set_font("Arial", "B", 14)
+            pdf.set_font("DejaVu", "B", 14)
             pdf.cell(0, 10, "Budgeting & Expense Tracker – Submission", ln=True)
 
-            pdf.set_font("Arial", "", 11)
+            pdf.set_font("DejaVu", "", 11)
             pdf.cell(0, 8, f"Name: {student_name}", ln=True)
             pdf.cell(0, 8, f"Course: {course}", ln=True)
             pdf.cell(0, 8, f"Date: {date.today().strftime('%d %B %Y')}", ln=True)
 
             pdf.ln(4)
 
-            # Budget summary
-            pdf.set_font("Arial", "B", 12)
+            # Budget Summary
+            pdf.set_font("DejaVu", "B", 12)
             pdf.cell(0, 8, "📊 Budget Summary", ln=True)
-            pdf.set_font("Arial", "", 11)
+            pdf.set_font("DejaVu", "", 11)
             pdf.cell(0, 8, f"Period: {period}", ln=True)
             pdf.cell(0, 8, f"Income: ₹{income:,.0f}", ln=True)
             pdf.cell(0, 8, f"Expenses: ₹{total_expenses:,.0f}", ln=True)
@@ -198,10 +186,10 @@ with tab2:
 
             pdf.ln(3)
 
-            # 30–30–20 rule
-            pdf.set_font("Arial", "B", 12)
+            # 30–30–20 Rule
+            pdf.set_font("DejaVu", "B", 12)
             pdf.cell(0, 8, "🇮🇳 30–30–20 Rule Check", ln=True)
-            pdf.set_font("Arial", "", 11)
+            pdf.set_font("DejaVu", "", 11)
             pdf.cell(0, 8, f"Needs: {needs_pct:.1f}%", ln=True)
             pdf.cell(0, 8, f"Wants: {wants_pct:.1f}%", ln=True)
             pdf.cell(0, 8, f"Savings: {savings_pct:.1f}%", ln=True)
@@ -209,9 +197,9 @@ with tab2:
             pdf.ln(4)
 
             # Reflection
-            pdf.set_font("Arial", "B", 12)
+            pdf.set_font("DejaVu", "B", 12)
             pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
-            pdf.set_font("Arial", "", 11)
+            pdf.set_font("DejaVu", "", 11)
             pdf.multi_cell(0, 8, f"1. Spending Surprise:\n{r1}\n")
             pdf.multi_cell(0, 8, f"2. Expense Reduction:\n{r2}\n")
             pdf.multi_cell(0, 8, f"3. 30–30–20 Rule Reflection:\n{r3}\n")
