@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 st.title("💰 Smart Budget & Expense Tracker")
-st.caption("Developed by Prof.Shalini Velappan, IIM Trichy")
+st.caption("Finance-first learning | No AI | Unicode-safe PDFs")
 
 # --------------------------------------------------
 # Tabs
@@ -139,6 +139,12 @@ with tab2:
     st.header("🧠 Reflection & Learning Submission")
     st.caption("Your answers will be saved as a Unicode-safe PDF.")
 
+    # ---- Font uploader (CRITICAL FIX) ----
+    font_file = st.file_uploader(
+        "📎 Upload Unicode Font (DejaVuSans.ttf – required once)",
+        type=["ttf"]
+    )
+
     student_name = st.text_input("Student Name")
     course = st.text_input("Course / Section")
 
@@ -150,71 +156,79 @@ with tab2:
 
     if st.button("📄 Generate PDF Submission"):
 
+        if not font_file:
+            st.error("Please upload DejaVuSans.ttf to generate the PDF.")
+            st.stop()
+
         if not student_name or not course:
             st.warning("Please enter your name and course.")
-        else:
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_auto_page_break(auto=True, margin=15)
+            st.stop()
 
-            # Load Unicode font
-            font_path = Path(__file__).parent / "DejaVuSans.ttf"
-            pdf.add_font("DejaVu", "", str(font_path), uni=True)
-            pdf.set_font("DejaVu", "", 11)
+        # Save uploaded font locally
+        font_path = Path("DejaVuSans.ttf")
+        with open(font_path, "wb") as f:
+            f.write(font_file.read())
 
-            # Title
-            pdf.set_font("DejaVu", "B", 14)
-            pdf.cell(0, 10, "Budgeting & Expense Tracker – Submission", ln=True)
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
 
-            pdf.set_font("DejaVu", "", 11)
-            pdf.cell(0, 8, f"Name: {student_name}", ln=True)
-            pdf.cell(0, 8, f"Course: {course}", ln=True)
-            pdf.cell(0, 8, f"Date: {date.today().strftime('%d %B %Y')}", ln=True)
+        pdf.add_font("DejaVu", "", str(font_path), uni=True)
+        pdf.set_font("DejaVu", "", 11)
 
-            pdf.ln(4)
+        # Title
+        pdf.set_font("DejaVu", "B", 14)
+        pdf.cell(0, 10, "Budgeting & Expense Tracker – Submission", ln=True)
 
-            # Budget Summary
-            pdf.set_font("DejaVu", "B", 12)
-            pdf.cell(0, 8, "📊 Budget Summary", ln=True)
-            pdf.set_font("DejaVu", "", 11)
-            pdf.cell(0, 8, f"Period: {period}", ln=True)
-            pdf.cell(0, 8, f"Income: ₹{income:,.0f}", ln=True)
-            pdf.cell(0, 8, f"Expenses: ₹{total_expenses:,.0f}", ln=True)
-            pdf.cell(0, 8, f"Savings: ₹{savings:,.0f}", ln=True)
-            pdf.cell(0, 8, f"Savings Rate: {savings_rate:.1f}%", ln=True)
-            pdf.cell(0, 8, f"Expense-to-Income Ratio: {expense_ratio:.1f}%", ln=True)
+        pdf.set_font("DejaVu", "", 11)
+        pdf.cell(0, 8, f"Name: {student_name}", ln=True)
+        pdf.cell(0, 8, f"Course: {course}", ln=True)
+        pdf.cell(0, 8, f"Date: {date.today().strftime('%d %B %Y')}", ln=True)
 
-            pdf.ln(3)
+        pdf.ln(4)
 
-            # 30–30–20 Rule
-            pdf.set_font("DejaVu", "B", 12)
-            pdf.cell(0, 8, "🇮🇳 30–30–20 Rule Check", ln=True)
-            pdf.set_font("DejaVu", "", 11)
-            pdf.cell(0, 8, f"Needs: {needs_pct:.1f}%", ln=True)
-            pdf.cell(0, 8, f"Wants: {wants_pct:.1f}%", ln=True)
-            pdf.cell(0, 8, f"Savings: {savings_pct:.1f}%", ln=True)
+        # Budget summary
+        pdf.set_font("DejaVu", "B", 12)
+        pdf.cell(0, 8, "📊 Budget Summary", ln=True)
+        pdf.set_font("DejaVu", "", 11)
+        pdf.cell(0, 8, f"Period: {period}", ln=True)
+        pdf.cell(0, 8, f"Income: ₹{income:,.0f}", ln=True)
+        pdf.cell(0, 8, f"Expenses: ₹{total_expenses:,.0f}", ln=True)
+        pdf.cell(0, 8, f"Savings: ₹{savings:,.0f}", ln=True)
+        pdf.cell(0, 8, f"Savings Rate: {savings_rate:.1f}%", ln=True)
+        pdf.cell(0, 8, f"Expense-to-Income Ratio: {expense_ratio:.1f}%", ln=True)
 
-            pdf.ln(4)
+        pdf.ln(3)
 
-            # Reflection
-            pdf.set_font("DejaVu", "B", 12)
-            pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
-            pdf.set_font("DejaVu", "", 11)
-            pdf.multi_cell(0, 8, f"1. Spending Surprise:\n{r1}\n")
-            pdf.multi_cell(0, 8, f"2. Expense Reduction:\n{r2}\n")
-            pdf.multi_cell(0, 8, f"3. 30–30–20 Rule Reflection:\n{r3}\n")
-            pdf.multi_cell(0, 8, f"4. Habit to Change:\n{r4}\n")
-            pdf.multi_cell(0, 8, f"5. One-Line Reflection:\n{r5}\n")
+        # 30–30–20 rule
+        pdf.set_font("DejaVu", "B", 12)
+        pdf.cell(0, 8, "🇮🇳 30–30–20 Rule Check", ln=True)
+        pdf.set_font("DejaVu", "", 11)
+        pdf.cell(0, 8, f"Needs: {needs_pct:.1f}%", ln=True)
+        pdf.cell(0, 8, f"Wants: {wants_pct:.1f}%", ln=True)
+        pdf.cell(0, 8, f"Savings: {savings_pct:.1f}%", ln=True)
 
-            filename = f"{student_name.replace(' ', '_')}_Budget_Submission.pdf"
-            pdf.output(filename)
+        pdf.ln(4)
 
-            with open(filename, "rb") as f:
-                st.download_button(
-                    "⬇️ Download PDF",
-                    data=f,
-                    file_name=filename,
-                    mime="application/pdf"
-                )
+        # Reflection
+        pdf.set_font("DejaVu", "B", 12)
+        pdf.cell(0, 8, "🧠 Student Reflection", ln=True)
+        pdf.set_font("DejaVu", "", 11)
+        pdf.multi_cell(0, 8, f"1. Spending Surprise:\n{r1}\n")
+        pdf.multi_cell(0, 8, f"2. Expense Reduction:\n{r2}\n")
+        pdf.multi_cell(0, 8, f"3. 30–30–20 Rule Reflection:\n{r3}\n")
+        pdf.multi_cell(0, 8, f"4. Habit to Change:\n{r4}\n")
+        pdf.multi_cell(0, 8, f"5. One-Line Reflection:\n{r5}\n")
 
-            st.success("✅ PDF generated successfully!")
+        filename = f"{student_name.replace(' ', '_')}_Budget_Submission.pdf"
+        pdf.output(filename)
+
+        with open(filename, "rb") as f:
+            st.download_button(
+                "⬇️ Download PDF",
+                data=f,
+                file_name=filename,
+                mime="application/pdf"
+            )
+
+        st.success("✅ PDF generated successfully!")
